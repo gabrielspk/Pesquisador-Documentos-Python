@@ -2,108 +2,160 @@ import os
 import glob
 import openpyxl
 import time
+import tkinter as tk
+from tkinter import filedialog, messagebox, scrolledtext
 
-diretorioAtual = "C:\\Users\\gabriel.ferreira\\Downloads" #armazena o diretorio que vai ser utilizado
+#função responsável por manipular e carregar os documentos que serão carregados no textbox
+def carregar_documentos(documentos_textbox):
+    documentos = documentos_textbox.get("1.0", tk.END).strip().split("\n")
+    return [documento.strip() for documento in documentos if documento.strip()] #retorna a lista de string formatada
 
-os.chdir(diretorioAtual) #alterando para o diretório selecionado
+#define a função pesquisar documentos, que vai iterar e percorrer cada arquivo do diretório selecionado
+def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos):
+    documentos_encontrados = {}
+    documentos_nao_encontrados = set(documentos)
+    qtde_arquivos_pesquisados = 0 #variável para contabilizar a quantidade de arquivos percorridos
 
-#diretorio aonde o arquivo com os documentos a serem pesquisados está
-diretorioPesquisaDocumentos = "C:\\Users\\gabriel.ferreira\\3D Objects\\Projetos Processamento\\INSIRA AQUI OS DOCUMENTOS A SEREM PESQUISADOS.txt"
+    #Percorre cada arquivo do diretório que será selecionado
+    for root, _, files in os.walk(diretorio_atual):
+        for file in files:
+            #valida se o arquivo não possui a extensão, e alguma sequência de caracteres que não deve ser incluída no laço
+            if not file.endswith(extensoes_descartadas) and file not in validacao_nomenclatura:
+                for documento in documentos_nao_encontrados.copy():
+                    if documento in open(os.path.join(root, file), errors="ignore").read():
+                        if documento not in documentos_encontrados:
+                            documentos_encontrados[documento] = [] #inicia uma nova chave com o documento encontrado
+                        documentos_encontrados[documento].append(os.path.join(file)) #atribui a nomenclatura do arquivo como um valor da chave documento.
+                        documentos_nao_encontrados.remove(documento) #retira o documento da tupla de documentos não encontrados
+                qtde_arquivos_pesquisados += 1
 
-#abrindo o diretorio o arquivo em modo de leitura
-diretorioPesquisaDocumentos = open(diretorioPesquisaDocumentos, 'r')
+    return documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados
 
-#variável que armazena o que não vai ser validado se o arquivo tiver determinado nome na nomenc (ex: retorno)
-validacaoNomenclatura = glob.glob('Retorno')
+#define a função aonde será criado o relatório Excel dos documentos pesquisados
+def criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, nome_arquivo):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
 
-#nessa váriavel, é armazenada todas as extensões dos arquivos que não queremos usar na pesquisa
-extensoesDescartadas = (".fpl", ".zip", ".ini", ".pdf")
+    #define o cabeçalho padrão do arquivo .xlsx
+    sheet['A1'] = 'Documentos em arquivos'
+    sheet['B1'] = 'Nomenclatura arquivo'
+    sheet['C1'] = 'Não encontrado'
 
-#varíavel aonde vai ser armazenados os documentos
-documentos = []
+    #define a contagem das linhas de docs encontrados e não encontrados
+    linha_docs_encontrados = 1
+    linha_docs_nao_encontrados = 1
 
-#dicionário onde vai ser armazenado o documento (chave) e em qual arquivo foi encontrado (valor)
-documentosEncontrados = {}
+    #percorre cada valores no dicionário de documentos encontrados para adiciona-los ao relatório .xlsx
+    for documento, arquivos in documentos_encontrados.items():
+        linha_docs_encontrados += 1 #cada vez que passar no laço será iterado +1 na linha por exemplo A1,A2,A3
+        sheet.cell(row=linha_docs_encontrados, column=1, value=documento)
+        for i, arquivo in enumerate(arquivos, start=1):
+            sheet.cell(row=linha_docs_encontrados, column=2, value=arquivo)
 
-#laço de repetição aonde vai ser pesquisado cada documento dentro do arquivo de texto
-for documentoInserido in diretorioPesquisaDocumentos.readlines():
-    documentoInserido = documentoInserido.rstrip() #rstrip usado para não fazer quebra de linha na string
-    documentos.append(documentoInserido) #inserindo cada documento passado no laço dentro da variável documentos
+    #percorre cada documento não encontrado, para adiciona-los ao relatório .xlsx
+    for documento in documentos_nao_encontrados:
+        linha_docs_nao_encontrados += 1
+        sheet.cell(row=linha_docs_nao_encontrados, column=3).value = documento
 
-documentosNãoEncontrados = set(documentos) #variável aonde vai ser armazenado primeiramente todos os documentos, de forma imutável
-qtdeArquivosPesquisados = 0 #variável para realizar a contagem de arquivos pesquisados
+    #chama a função "incrementar_nome_arquivo" para iterar sobre cada arquivo com a nomenclatura igual
+    nome_arquivo = incrementar_nome_arquivo(nome_arquivo)
+    try:
+        workbook.save(nome_arquivo)
+        messagebox.showinfo("Relatório Gerado", f"Relatório gerado com sucesso: {nome_arquivo}") #traz mensagem de sucesso ao gerar o relatório
+    except PermissionError:
+        messagebox.showerror("Erro", "Não foi possível gerar o relatório, pois está aberto por outro programa.")#tratamento de exceção caso já esteja aberto
 
-#Inicio do cálculo de tempo em que a execução é executada
-inicio = time.time() 
+#função responsável por iterar caso já haja arquivos salvos no diretório com a mesma nomenclatura
+def incrementar_nome_arquivo(nome_arquivo):
+    count = 1
+    while os.path.exists(nome_arquivo): #enquanto o nome do arquivo existir, será somado mais um ao final da contagem
+        nome_arquivo = f"RelatorioProcessamento({count}).xlsx"
+        count += 1
+    return nome_arquivo
 
-#laço de repetição que pesquisa em cada arquivo presente no diretório parametrizado
-for root, _, files in os.walk(diretorioAtual):
-    for file in files:
-        if not file.endswith(extensoesDescartadas) and file not in validacaoNomenclatura:
-            for documento in documentosNãoEncontrados.copy():
-                if documento in open(os.path.join(root, file), errors="ignore").read():
-                    if documento not in documentosEncontrados:
-                        documentosEncontrados[documento] = []
-                    documentosEncontrados[documento].append(os.path.join(file))
-                    documentosNãoEncontrados.remove(documento)
-                    print(documentosEncontrados)
-            qtdeArquivosPesquisados += 1
+#define a função para o botão aonde será selecionado o diretório
+def btn_selecionar_diretorio():
+    diretorio = filedialog.askdirectory()
+    diretorio_entry.delete(0, tk.END) #removendo o diretório anterior para a nova entrada
+    diretorio_entry.insert(0, diretorio) #inserindo o novo diretório selecionado pelo usuário
 
-#iniciando a planilha no excel
-workbook = openpyxl.Workbook()
-sheet = workbook.active
+#define a função do botão pesquisar aonde vai chamar as demais funções
+def btn_pesquisar():
+    diretorio_atual = diretorio_entry.get()
+    if not diretorio_atual:
+        messagebox.showerror("Erro", "Por favor, selecione um diretório.")
+        return
+    
+    extensoes_descartadas = (".fpl", ".zip", ".ini", ".pdf")#define um valor fixo das extensões descartadas
+    validacao_nomenclatura = glob.glob('Retorno')#define um valor fixo do tipo de sequencia de string a não ser validado na nomenclatura
+    documentos = carregar_documentos(documentos_textbox)#pega os arquivos usando a função carregar_documentos dentro do textbox
 
-#iniciando a planilha do relatório declarando os cabeçalhos
-sheet['A1'] = 'Documentos em arquivos'
-sheet['B1'] = 'Nomenclatura arquivo'
-sheet['C1'] = 'Não encontrado'
+    documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados = pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos)
 
-#comentado essa linha de código, pois encontrei uma solução melho mas não descartei
-'''for row, (documento, arquivos) in enumerate(documentosEncontrados.items(), start=2):
-    print(f'Documento {documento} encontrado nos arquivos: {", ".join(arquivos)}. Pesquisa realizada em {qtdeArquivosPesquisados} arquivos')
-    for arquivo in enumerate(arquivos, start=1):
-        sheet.cell(row=row, column=1).value = documento
+    #cria o relatório com base dos documentos encontrados, não eonctrados e a quantidade dos arquivos pesquisados
+    criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, "RelatorioProcessamento.xlsx")
 
-for row, documento in enumerate(documentosNãoEncontrados, start=2):
-    print(f'documento {documento} não encontrado em arquivos. Pesquisa realizada em {qtdeArquivosPesquisados} arquivos')
-    sheet.cell(row=row, column=2).value = documento'''
+    #insere todos os dados dentro da textbox de log
+    tempo_execucao = time.time() - inicio
+    log_textbox.insert(tk.END, f'Tempo de execução: {tempo_execucao:.4f} segundos\n')
+    log_textbox.insert(tk.END, f'Documentos encontrados: {documentos_encontrados}\n')
+    log_textbox.insert(tk.END, f'Documentos não encontrados: {documentos_nao_encontrados}\n')
+    log_textbox.insert(tk.END, f'Quantidade de arquivos pesquisados: {qtde_arquivos_pesquisados}\n\n')
 
-#Iniciando variáveis para iterar em cada linha na planilha
-linhaDocsEncontrados = 1
-linhaDocsNaoEncontrados = 1
+def limpar_log():
+    log_textbox.delete('1.0', tk.END)
 
-#Laço para escrever em cada linha do excel as informações
-for documento, arquivos in documentosEncontrados.items():
-    print(f'Documento {documento} encontrado nos arquivos: {", ".join(arquivos)} Pesquisa realizada em {qtdeArquivosPesquisados}')
-    linhaDocsEncontrados += 1
-    sheet.cell(row=linhaDocsEncontrados, column=1, value=documento)
+# Criar a janela
+janela = tk.Tk()
+janela.title("Pesquisa de Documentos")
+janela.configure(bg="#E5E8E8")
+janela.resizable(False,False)
 
-    for i, arquivo in enumerate(arquivos,start=1):
-        sheet.cell(row=linhaDocsEncontrados, column=2, value=arquivo)
+# Criar os widgets
+diretorio_frame = tk.Frame(janela)
+diretorio_frame.pack(padx=10, pady=5)
+diretorio_frame.configure(bg="#E5E8E8")
 
-#Laço para escrever em cada linha do excel as informações que não foram encontrado em arquivos
-for documento in documentosNãoEncontrados:
-    linhaDocsNaoEncontrados += 1
-    print(f"Documento {documento} não encontrado em arquivo. Pesquisado em {qtdeArquivosPesquisados} arquivos")
-    sheet.cell(row=linhaDocsNaoEncontrados, column=3).value = documento
 
-#finalizando o contabilizador de tempo da execução
-fim = time.time()
+diretorio_label = tk.Label(diretorio_frame, font=("Helvetica Neue",12), text="Diretório:")
+diretorio_label.grid(row=0, column=0, padx=5, pady=5)
+diretorio_label.configure(bg="#E5E8E8")
 
-#exibindo o tempo que foi percorrido na execução da aplicação
-print ('Tempo de execucao: %.4f' % (fim - inicio))
+diretorio_entry = tk.Entry(diretorio_frame, width=50)
+diretorio_entry.grid(row=0, column=1, padx=5, pady=5)
 
-#declarando o nome do arquivo .xlsx que vai ser salvo os documentos
-nomeArquivo = "RelatorioProcessamento.xlsx"
-count = 1 #contador para iterar caso o arquivo já exista, para que não haja duplicidade na pasta
+selecionar_documentos_button = tk.Button(diretorio_frame, text="Selecionar", command=btn_selecionar_diretorio)
+selecionar_documentos_button.grid(row=0, column=2, padx=5, pady=5)
 
-#enquanto existir arquivo, vai ser adicionado uma numeração na nomenclatura para que não haja duplicidade de nomenclatura.
-while os.path.exists(nomeArquivo):
-    nomeArquivo = f"RelatorioProcessamento({count}).xlsx"
-    count += 1
+documentos_frame = tk.Frame(janela)
+documentos_frame.pack(padx=10, pady=5)
+documentos_frame.configure(bg="#E5E8E8")
 
-#tratamento de erro e exceção caso o arquivo excel já esteja aberto
-try:
-    workbook.save(nomeArquivo)
-except PermissionError:
-    print(f"Não foi possível gerar o relatório, pois está aberto por outro programa.")
+documentos_label = tk.Label(documentos_frame, font=("Helvetica",12), text="Documentos (um embaixo do outro)")
+documentos_label.grid(row=0, column=0, padx=5, pady=5)
+documentos_label.configure(bg="#E5E8E8")
+
+documentos_textbox = scrolledtext.ScrolledText(documentos_frame, width=50, height=5)
+documentos_textbox.grid(row=1, column=0, padx=5, pady=5)
+
+pesquisar_button = tk.Button(janela, text="Pesquisar", command=btn_pesquisar)
+pesquisar_button.pack(padx=10, pady=5)
+
+log_frame = tk.Frame(janela)
+log_frame.pack(padx=10, pady=5)
+log_frame.configure(bg="#E5E8E8")
+
+log_label = tk.Label(log_frame, font=("Helvetica Neue", 12), text="Log:")
+log_label.grid(row=0, column=0, padx=5, pady=5)
+log_label.configure(bg="#E5E8E8")
+
+log_textbox = scrolledtext.ScrolledText(log_frame, width=50, height=10)
+log_textbox.grid(row=1, column=0, padx=5, pady=5)
+log_textbox.configure(bg="#F2F4F4")
+
+limpar_button = tk.Button(log_frame, text="Limpar", command=limpar_log)
+limpar_button.grid(row=2, column=0, padx=5, pady=5)
+
+#Inicia o loop da interface gráfica
+inicio = time.time()
+janela.mainloop()
