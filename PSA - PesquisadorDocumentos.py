@@ -90,7 +90,7 @@ def btn_pesquisar():
         messagebox.showerror("Erro", "Por favor, selecione um diretório.")
         return
     
-    extensoes_descartadas = (".zip", ".ini", ".pdf")#definindo um valor fixo das extensões descartadas
+    extensoes_descartadas = (".fpl", ".zip", ".ini", ".pdf")#definindo um valor fixo das extensões descartadas
     validacao_nomenclatura = glob.glob('Retorno')#definindo um valor fixo do tipo de sequencia de string a não ser validado na nomenclatura
     documentos = carregar_documentos(documentos_textbox)#pega os arquivos usando a função carregar_documentos dentro do textbox
 
