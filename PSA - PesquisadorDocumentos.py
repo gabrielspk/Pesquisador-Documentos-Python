@@ -4,6 +4,7 @@ import openpyxl
 import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
+from ttkbootstrap import Style
 
 #função responsável por manipular e carregar os documentos que serão carregados no textbox
 def carregar_documentos(documentos_textbox):
@@ -28,8 +29,11 @@ def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomen
                         documentos_encontrados[documento].append(os.path.join(file)) #atribui a nomenclatura do arquivo como um valor da chave documento.
                         documentos_nao_encontrados.remove(documento) #retira o documento da tupla de documentos não encontrados
                 qtde_arquivos_pesquisados += 1
+    
+    qtde_documentos_nao_econtrados = len(documentos_nao_encontrados)
+    qtde_documentos_encontrados = len(documentos_encontrados)
 
-    return documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados
+    return documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_econtrados, qtde_documentos_encontrados
 
 #define a função aonde será criado o relatório Excel dos documentos pesquisados
 def criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, nome_arquivo):
@@ -86,21 +90,23 @@ def btn_pesquisar():
         messagebox.showerror("Erro", "Por favor, selecione um diretório.")
         return
     
-    extensoes_descartadas = (".fpl", ".zip", ".ini", ".pdf")#define um valor fixo das extensões descartadas
-    validacao_nomenclatura = glob.glob('Retorno')#define um valor fixo do tipo de sequencia de string a não ser validado na nomenclatura
+    extensoes_descartadas = (".zip", ".ini", ".pdf")#definindo um valor fixo das extensões descartadas
+    validacao_nomenclatura = glob.glob('Retorno')#definindo um valor fixo do tipo de sequencia de string a não ser validado na nomenclatura
     documentos = carregar_documentos(documentos_textbox)#pega os arquivos usando a função carregar_documentos dentro do textbox
 
-    documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados = pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos)
+    documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_encontrados, qtde_documentos_encontrados = pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos)
 
     #cria o relatório com base dos documentos encontrados, não eonctrados e a quantidade dos arquivos pesquisados
     criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, "RelatorioProcessamento.xlsx")
 
-    #insere todos os dados dentro da textbox de log
+    #inserindo todos os dados dentro da textbox do log
     tempo_execucao = time.time() - inicio
-    log_textbox.insert(tk.END, f'Tempo de execução: {tempo_execucao:.4f} segundos\n')
     log_textbox.insert(tk.END, f'Documentos encontrados: {documentos_encontrados}\n')
-    log_textbox.insert(tk.END, f'Documentos não encontrados: {documentos_nao_encontrados}\n')
-    log_textbox.insert(tk.END, f'Quantidade de arquivos pesquisados: {qtde_arquivos_pesquisados}\n\n')
+    log_textbox.insert(tk.END, f'Documentos não encontrados: {documentos_nao_encontrados}\n\n')
+    log_textbox.insert(tk.END, f'Quantidade de arquivos pesquisados: {qtde_arquivos_pesquisados}\n')
+    log_textbox.insert(tk.END, f'Total de documentos não encontrados em arquivo: {qtde_documentos_nao_encontrados}\n')
+    log_textbox.insert(tk.END, f'Total de documentos encontrados em arquivo: {qtde_documentos_encontrados}\n')
+    log_textbox.insert(tk.END, f'Tempo de execução: {tempo_execucao:.2f} segundos')
 
 def limpar_log():
     log_textbox.delete('1.0', tk.END)
@@ -108,54 +114,43 @@ def limpar_log():
 # Criar a janela
 janela = tk.Tk()
 janela.title("Pesquisa de Documentos")
-janela.configure(bg="#E5E8E8")
-janela.resizable(False,False)
+janela.geometry("500x500")
+janela.resizable(False, False)
+
+# Aplicar estilo do ttkbootstrap
+style = Style(theme='flatly')
 
 # Criar os widgets
 diretorio_frame = tk.Frame(janela)
-diretorio_frame.pack(padx=10, pady=5)
-diretorio_frame.configure(bg="#E5E8E8")
+diretorio_frame.pack(pady=20)
 
-
-diretorio_label = tk.Label(diretorio_frame, font=("Helvetica Neue",12), text="Diretório:")
-diretorio_label.grid(row=0, column=0, padx=5, pady=5)
-diretorio_label.configure(bg="#E5E8E8")
+diretorio_label = tk.Label(diretorio_frame, text="Diretório:", font=("Montserrat", 12, 'bold'))
+diretorio_label.grid(row=0, column=0, padx=5)
 
 diretorio_entry = tk.Entry(diretorio_frame, width=50)
-diretorio_entry.grid(row=0, column=1, padx=5, pady=5)
+diretorio_entry.grid(row=0, column=1, padx=5)
 
-selecionar_documentos_button = tk.Button(diretorio_frame, text="Selecionar", command=btn_selecionar_diretorio)
-selecionar_documentos_button.grid(row=0, column=2, padx=5, pady=5)
+selecionar_diretorio_button = tk.Button(diretorio_frame, text="Selecionar", width=10, command=btn_selecionar_diretorio)
+selecionar_diretorio_button.grid(row=0, column=2, padx=5)
 
-documentos_frame = tk.Frame(janela)
-documentos_frame.pack(padx=10, pady=5)
-documentos_frame.configure(bg="#E5E8E8")
+documentos_label = tk.Label(janela, text="Documentos (um embaixo do outro):", font=("Montserrat", 12, 'bold'))
+documentos_label.pack(pady=5)
 
-documentos_label = tk.Label(documentos_frame, font=("Helvetica",12), text="Documentos (um embaixo do outro)")
-documentos_label.grid(row=0, column=0, padx=5, pady=5)
-documentos_label.configure(bg="#E5E8E8")
+documentos_textbox = scrolledtext.ScrolledText(janela, width=50, height=10)
+documentos_textbox.pack()
 
-documentos_textbox = scrolledtext.ScrolledText(documentos_frame, width=50, height=5)
-documentos_textbox.grid(row=1, column=0, padx=5, pady=5)
-
-pesquisar_button = tk.Button(janela, text="Pesquisar", command=btn_pesquisar)
-pesquisar_button.pack(padx=10, pady=5)
+pesquisar_button = tk.Button(janela, text="Pesquisar", width=11, command=btn_pesquisar)
+pesquisar_button.pack(pady=5, padx=5)
 
 log_frame = tk.Frame(janela)
-log_frame.pack(padx=10, pady=5)
-log_frame.configure(bg="#E5E8E8")
+log_frame.pack(padx=5, pady=5)
 
-log_label = tk.Label(log_frame, font=("Helvetica Neue", 12), text="Log:")
-log_label.grid(row=0, column=0, padx=5, pady=5)
-log_label.configure(bg="#E5E8E8")
+log_textbox = scrolledtext.ScrolledText(log_frame, width=60, height=10)
+log_textbox.pack()
 
-log_textbox = scrolledtext.ScrolledText(log_frame, width=50, height=10)
-log_textbox.grid(row=1, column=0, padx=5, pady=5)
-log_textbox.configure(bg="#F2F4F4")
+limpar_log_button = tk.Button(log_frame, text="Limpar Log", width=10, command=limpar_log)
+limpar_log_button.pack(pady=5)
 
-limpar_button = tk.Button(log_frame, text="Limpar", command=limpar_log)
-limpar_button.grid(row=2, column=0, padx=5, pady=5)
-
-#Inicia o loop da interface gráfica
+# Iniciar a janela
 inicio = time.time()
 janela.mainloop()
