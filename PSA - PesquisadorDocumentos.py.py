@@ -6,6 +6,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from ttkbootstrap import Style
 
+diretorio_selecionado = ""
+
 #função responsável por manipular e carregar os documentos que serão carregados no textbox
 def carregar_documentos(documentos_textbox):
     documentos = documentos_textbox.get("1.0", tk.END).strip().split("\n")
@@ -36,7 +38,7 @@ def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomen
     return documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_econtrados, qtde_documentos_encontrados
 
 #define a função aonde será criado o relatório Excel dos documentos pesquisados
-def criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, nome_arquivo):
+def criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, nome_arquivo, diretorio_atual):
     workbook = openpyxl.Workbook()
     sheet = workbook.active
 
@@ -62,9 +64,12 @@ def criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arq
         sheet.cell(row=linha_docs_nao_encontrados, column=3).value = documento
 
     #chama a função "incrementar_nome_arquivo" para iterar sobre cada arquivo com a nomenclatura igual
+    os.chdir(diretorio_atual)
     nome_arquivo = incrementar_nome_arquivo(nome_arquivo)
+    caminho_relatorio = os.path.join(diretorio_atual, nome_arquivo)
+
     try:
-        workbook.save(nome_arquivo)
+        workbook.save(caminho_relatorio)
         messagebox.showinfo("Relatório Gerado", f"Relatório gerado com sucesso: {nome_arquivo}") #traz mensagem de sucesso ao gerar o relatório
     except PermissionError:
         messagebox.showerror("Erro", "Não foi possível gerar o relatório, pois está aberto por outro programa.")#tratamento de exceção caso já esteja aberto
@@ -79,35 +84,37 @@ def incrementar_nome_arquivo(nome_arquivo):
 
 #define a função para o botão aonde será selecionado o diretório
 def btn_selecionar_diretorio():
-    diretorio = filedialog.askdirectory()
+    global diretorio_selecionado
+    diretorio_selecionado = filedialog.askdirectory()
     diretorio_entry.delete(0, tk.END) #removendo o diretório anterior para a nova entrada
-    diretorio_entry.insert(0, diretorio) #inserindo o novo diretório selecionado pelo usuário
+    diretorio_entry.insert(0, diretorio_selecionado) #inserindo o novo diretório selecionado pelo usuário
 
 #define a função do botão pesquisar aonde vai chamar as demais funções
 def btn_pesquisar():
-    diretorio_atual = diretorio_entry.get()
+    diretorio_atual = diretorio_selecionado
     if not diretorio_atual:
         messagebox.showerror("Erro", "Por favor, selecione um diretório.")
         return
-    
-    extensoes_descartadas = (".fpl", ".zip", ".ini", ".pdf")#definindo um valor fixo das extensões descartadas
-    validacao_nomenclatura = glob.glob('Retorno')#definindo um valor fixo do tipo de sequencia de string a não ser validado na nomenclatura
-    documentos = carregar_documentos(documentos_textbox)#pega os arquivos usando a função carregar_documentos dentro do textbox
+
+    extensoes_descartadas = (".fpl", ".zip", ".ini", ".pdf") #definindo um valor fixo das extensões descartadas
+    validacao_nomenclatura = glob.glob('Retorno') #definindo um valor fixo do tipo de sequencia de string a não ser validado na nomenclatura
+    documentos = carregar_documentos(documentos_textbox) #pega os arquivos usando a função carregar_documentos dentro do textbox
 
     documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_encontrados, qtde_documentos_encontrados = pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos)
 
     #cria o relatório com base dos documentos encontrados, não eonctrados e a quantidade dos arquivos pesquisados
-    criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, "RelatorioProcessamento.xlsx")
+    criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, "RelatorioProcessamento.xlsx", diretorio_atual)
 
     #inserindo todos os dados dentro da textbox do log
     tempo_execucao = time.time() - inicio
-    log_textbox.insert(tk.END, f'Documentos encontrados: {documentos_encontrados}\n')
-    log_textbox.insert(tk.END, f'Documentos não encontrados: {documentos_nao_encontrados}\n\n')
-    log_textbox.insert(tk.END, f'Quantidade de arquivos pesquisados: {qtde_arquivos_pesquisados}\n')
+    #log_textbox.insert(tk.END, f'Documentos encontrados: {documentos_encontrados}\n')
+    #log_textbox.insert(tk.END, f'Documentos não encontrados: {documentos_nao_encontrados}\n\n')
+    log_textbox.insert(tk.END, f'\nQuantidade de arquivos pesquisados: {qtde_arquivos_pesquisados}\n')
     log_textbox.insert(tk.END, f'Total de documentos não encontrados em arquivo: {qtde_documentos_nao_encontrados}\n')
     log_textbox.insert(tk.END, f'Total de documentos encontrados em arquivo: {qtde_documentos_encontrados}\n')
     log_textbox.insert(tk.END, f'Tempo de execução: {tempo_execucao:.2f} segundos')
 
+#define a função responsável por limpar o log
 def limpar_log():
     log_textbox.delete('1.0', tk.END)
 
