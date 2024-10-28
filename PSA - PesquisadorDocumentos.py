@@ -472,7 +472,7 @@ limpar_log_button.pack(pady=5)
 ##############################################################################################################################################
 
 aba2 = ttk.Frame(notebook)
-notebook.add(aba2, text='Validação Schedulle')
+notebook.add(aba2, text='Análise de relatórios')
 
 # Configurar colunas
 aba2.grid_columnconfigure(0, weight=1)
@@ -480,7 +480,7 @@ aba2.grid_columnconfigure(1, weight=3)  # Aumentar a largura da coluna do Entry
 aba2.grid_columnconfigure(2, weight=1)
 
 # Título centralizado
-nova_funcionalidade_label = tk.Label(aba2, text="Validação Schedulle", font=("Montserrat", 12, 'bold'))
+nova_funcionalidade_label = tk.Label(aba2, text="Análise e validação de relatórios", font=("Montserrat", 12, 'bold'))
 nova_funcionalidade_label.grid(row=0, column=0, columnspan=3, pady=10, padx=3, sticky="nsew")
 
 label_descricao_aba2 = tk.Label(
