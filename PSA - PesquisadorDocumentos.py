@@ -7,36 +7,71 @@ from tkinter import filedialog, messagebox, scrolledtext
 from ttkbootstrap import Style
 from tkinter import ttk
 import pandas as pd
+import re
+from concurrent.futures import ThreadPoolExecutor
 
 diretorio_selecionado = ""
 
 def carregar_documentos(documentos_textbox): #função responsável por pegar os documentos do textbox para realizar a pesquisa dos documentos
+    if not documentos_textbox.get("1.0", tk.END).strip():
+        messagebox.showerror("Erro", "Por favor, insira os documentos no campo de texto.")  
+        return
+    
     documentos = documentos_textbox.get("1.0", tk.END).strip().split("\n") #declarando a variável documentos e pegando com quebra de linha os mesmos e armazenando
     
     return [documento.strip() for documento in documentos if documento.strip()] #retornando uma lista de documentos já ordenados
 
-def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos): #função responsável por fazer a busca dos docs.
-    documentos_encontrados = {} #declarando um dicionário de documentos encontrados
-    documentos_nao_encontrados = set(documentos) #declarando uma tupla de documentos não encontrados
-    qtde_arquivos_pesquisados = 0 #declarando uma variável para contabilizar a quantidade de documentos pesquisados
-
-    #declarando o primeiro laço para pequisar no diretório dos arquivos no qual será declarado usando os.walk
-    for root, _, files in os.walk(diretorio_atual):
-        for file in files: #para cada arquivo nos arquivos
-            #valida se a nomenclatura do arquivo atual não está na lista de extensao descartadas e na lista de validacoes descartadas 
-            if not file.endswith(extensoes_descartadas) and not any(file.startswith(validacao) for validacao in validacao_nomenclatura):
-                for documento in documentos_nao_encontrados.copy(): #abre um novo for para os documentos em documentos não encontrados (todos a príncipio)
-                    if documento in open(os.path.join(root, file), errors="ignore").read(): #SE o documento estiver dentro do arquivo atual
-                        if documento not in documentos_encontrados: #valida se o arquivo ainda não está na lista de documentos encontrados
-                            documentos_encontrados[documento] = [] #joga o documento atual em documentos encontrados como a chave 
-                        documentos_encontrados[documento].append(os.path.join(file)) #joga a nomenclatura do arquivo como valor
-                        documentos_nao_encontrados.remove(documento) #remove o arquivo encontrado da lista de documentos não encontrados
-                qtde_arquivos_pesquisados += 1 #contabiliza na variável de arquivos pesquisados
+def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos):
+    documentos_encontrados = {}
+    documentos_nao_encontrados = set(documentos)
+    qtde_arquivos_pesquisados = 0
     
-    qtde_documentos_nao_encontrados = len(documentos_nao_encontrados) #variável para leitura de quantos arquivos não foram encontrados
-    qtde_documentos_encontrados = len(documentos_encontrados) #variável para leitura de quantos arquivos foram encontrados
+    # Prepara um regex de busca com os documentos
+    regex_documentos = re.compile('|'.join(re.escape(doc) for doc in documentos))
+    
+    # Função para processar cada arquivo
+    def processar_arquivo(file_path):
+        nonlocal qtde_arquivos_pesquisados
+        
+        #Abre o arquivo apenas uma vez
+        try:
+            with open(file_path, errors="ignore") as f:
+                conteudo = f.read()
+                
+                # Verifica se há algum documento no arquivo
+                documentos_encontrados_no_arquivo = regex_documentos.findall(conteudo)
+                if documentos_encontrados_no_arquivo:
+                    for documento in documentos_encontrados_no_arquivo:
+                        if documento not in documentos_encontrados:
+                            documentos_encontrados[documento] = []
+                        documentos_encontrados[documento].append(os.path.basename(file_path))
+                        documentos_nao_encontrados.discard(documento)
+                        
+                qtde_arquivos_pesquisados += 1
+        
+        except Exception as e:
+            print(f"Erro ao ler o arquivo {file_path}: {e}")
 
-    #fazendo o retorno das buscas
+    #Loop pelos arquivos no diretório
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for root, _, files in os.walk(diretorio_atual):
+            for file in files:
+                # Filtra arquivos por extensões e nome
+                if not any(file.endswith(ext) for ext in extensoes_descartadas) and \
+                   not any(file.startswith(validacao) for validacao in validacao_nomenclatura):
+                    
+                    #Adiciona o arquivo para processamento
+                    file_path = os.path.join(root, file)
+                    futures.append(executor.submit(processar_arquivo, file_path))
+        
+        #Espera todos os arquivos serem processados
+        for future in futures:
+            future.result()
+
+    qtde_documentos_nao_encontrados = len(documentos_nao_encontrados)
+    qtde_documentos_encontrados = len(documentos_encontrados)
+    
     return documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_encontrados, qtde_documentos_encontrados
 
 def criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, nome_arquivo, diretorio_atual): #função responsável por criar relatório dos arquivos pesquisados
@@ -91,38 +126,42 @@ def btn_selecionar_diretorio(entry): #função responsável por dar a entrada de
     entry.insert(0, diretorio_selecionado)
 
 def btn_pesquisar():
-    diretorio_atual = diretorio_selecionado #diretório selecionado pelo usuário
+    inicio = time.time()  # Inicia a contagem do tempo no começo da função
+
+    diretorio_atual = diretorio_selecionado  # Diretório selecionado pelo usuário
     if not diretorio_atual:
-        messagebox.showerror("Erro", "Por favor, selecione um diretório.") #erro se não for selecionado um diretório
+        messagebox.showerror("Erro", "Por favor, selecione um diretório.")  # Erro se não for selecionado um diretório
         return
 
-    #declarando as extensões que não vai ser validadas
+    # Declarando as extensões que não vão ser validadas
     extensoes_descartadas = (".fpl", ".zip", ".ini", ".pdf", ".xlsx")
 
-    #se o botão de validar o fpl estiver ativo, será retirado ".fpl" das extensões descartadas
+    # Se o botão de validar o fpl estiver ativo, será retirado ".fpl" das extensões descartadas
     if var_fpl.get() == 1:
         extensoes_descartadas = extensoes_descartadas[1:]
 
-    #Declarando nomenclaturas que não devem ser percorridas
-    validacao_nomenclatura = []#
+    # Declarando nomenclaturas que não devem ser percorridas
+    validacao_nomenclatura = []
 
-    print(validacao_nomenclatura)
-
-    #caputrando os documentos da função carregar documentos
+    # Capturando os documentos da função carregar documentos
     documentos = carregar_documentos(documentos_textbox)
 
-    #chamando a função pesquisar_documentos para fazer a pesquisa
-    documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_encontrados, qtde_documentos_encontrados = pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos)
+    # Chamando a função pesquisar_documentos para fazer a pesquisa
+    documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_encontrados, qtde_documentos_encontrados = pesquisar_documentos(
+        diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos)
 
-    #chamando a função para criar o relatório
+    # Chamando a função para criar o relatório
     criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, "RelatorioProcessamento.xlsx", diretorio_atual)
 
-    #inserindo os dados
-    tempo_execucao = time.time() - inicio
-    log_textbox.insert(tk.END, f'\nQuantidade de arquivos pesquisados: {qtde_arquivos_pesquisados}\n')
+    # Inserindo os dados
+    tempo_execucao = time.time() - inicio  # Calcula o tempo de execução
+    minutos, segundos = divmod(tempo_execucao, 60)  # Divide o tempo em minutos e segundos
+    tempo_formatado = f'{int(minutos):02}:{int(segundos):02}'  # Formata o tempo no formato MM:SS
+
+    log_textbox.insert(tk.END, f'Quantidade de arquivos pesquisados: {qtde_arquivos_pesquisados}\n')
     log_textbox.insert(tk.END, f'Total de documentos não encontrados em arquivo: {qtde_documentos_nao_encontrados}\n')
     log_textbox.insert(tk.END, f'Total de documentos encontrados em arquivo: {qtde_documentos_encontrados}\n')
-    log_textbox.insert(tk.END, f'Tempo de execução: {tempo_execucao:.2f} segundos')
+    log_textbox.insert(tk.END, f'Tempo de execução: {tempo_formatado}\n\n')
 
 def limpar_log(): #função responsável pelo botão de limpar o log
     log_textbox.delete('1.0', tk.END)
