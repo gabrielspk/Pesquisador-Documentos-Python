@@ -1,4 +1,4 @@
-**Pesquisador de Documentos - Validação e Extração de Dados**
+# Pesquisador de Documentos - Validação e Extração de Dados
 
 📌 **Descrição**
 
@@ -10,9 +10,10 @@ Análise de Relatórios: Valida planilhas extraídas do GA, verificando discrep�
 
 Pesquisa Reversa: Extrai dados de arquivos .TXT com base em posições e comprimentos definidos pelo usuário.
 
-⚙️ **Funcionalidades**
+# ⚙️ **Funcionalidades**
 
-🔍 1. Pesquisa de Documentos
+🔍 1. **Pesquisa de Documentos**
+
 Realiza uma busca recursiva em um diretório.
 
 Identifica quais documentos foram encontrados e quais não foram.
@@ -71,7 +72,7 @@ Clique em Pesquisar.
 
 O resultado será salvo em um arquivo no diretório escolhido.
 
-🛠️ **Tecnologias Utilizadas**
+# 🛠️ **Tecnologias Utilizadas**
 
 Python
 
