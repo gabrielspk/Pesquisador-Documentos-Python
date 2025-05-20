@@ -9,10 +9,12 @@ from tkinter import ttk
 import pandas as pd
 import re
 from concurrent.futures import ThreadPoolExecutor
+import chardet
 
 diretorio_selecionado = ""
 
-def carregar_documentos(documentos_textbox): #função responsável por pegar os documentos do textbox para realizar a pesquisa dos documentos
+#função responsável por pegar os documentos do textbox para realizar a pesquisa dos documentos
+def carregar_documentos(documentos_textbox): 
     if not documentos_textbox.get("1.0", tk.END).strip():
         messagebox.showerror("Erro", "Por favor, insira os documentos no campo de texto.")  
         return
@@ -21,34 +23,42 @@ def carregar_documentos(documentos_textbox): #função responsável por pegar os
     
     return [documento.strip() for documento in documentos if documento.strip()] #retornando uma lista de documentos já ordenados
 
+#função responsável na identificação do enconding
+def detectar_encoding(file_path, tamanho=1000):
+    with open(file_path, 'rb') as f:
+        rawdata = f.read(tamanho)
+    resultado = chardet.detect(rawdata)
+    return resultado['encoding'] or 'utf-8'  #fallback se não detectar
+
 def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomenclatura, documentos):
     documentos_encontrados = {}
     documentos_nao_encontrados = set(documentos)
     qtde_arquivos_pesquisados = 0
-    
-    # Prepara um regex de busca com os documentos
+
+    #Prepara um regex de busca com os documentos
     regex_documentos = re.compile('|'.join(re.escape(doc) for doc in documentos))
-    
-    # Função para processar cada arquivo
+
+    #Função para processar cada arquivo
     def processar_arquivo(file_path):
         nonlocal qtde_arquivos_pesquisados
-        
-        #Abre o arquivo apenas uma vez
+
         try:
-            with open(file_path, errors="ignore") as f:
+            # Detecta o encoding real do arquivo
+            encoding_detectado = detectar_encoding(file_path)
+            
+            with open(file_path, encoding=encoding_detectado) as f:
                 conteudo = f.read()
-                
-                # Verifica se há algum documento no arquivo
-                documentos_encontrados_no_arquivo = regex_documentos.findall(conteudo)
-                if documentos_encontrados_no_arquivo:
-                    for documento in documentos_encontrados_no_arquivo:
-                        if documento not in documentos_encontrados:
-                            documentos_encontrados[documento] = []
-                        documentos_encontrados[documento].append(os.path.basename(file_path))
-                        documentos_nao_encontrados.discard(documento)
-                        
-                qtde_arquivos_pesquisados += 1
-        
+
+            documentos_encontrados_no_arquivo = regex_documentos.findall(conteudo)
+            if documentos_encontrados_no_arquivo:
+                for documento in documentos_encontrados_no_arquivo:
+                    if documento not in documentos_encontrados:
+                        documentos_encontrados[documento] = []
+                    documentos_encontrados[documento].append(os.path.basename(file_path))
+                    documentos_nao_encontrados.discard(documento)
+
+            qtde_arquivos_pesquisados += 1
+
         except Exception as e:
             print(f"Erro ao ler o arquivo {file_path}: {e}")
 
@@ -60,19 +70,23 @@ def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomen
                 # Filtra arquivos por extensões e nome
                 if not any(file.endswith(ext) for ext in extensoes_descartadas) and \
                    not any(file.startswith(validacao) for validacao in validacao_nomenclatura):
-                    
-                    #Adiciona o arquivo para processamento
+
                     file_path = os.path.join(root, file)
                     futures.append(executor.submit(processar_arquivo, file_path))
-        
-        #Espera todos os arquivos serem processados
+
         for future in futures:
             future.result()
 
     qtde_documentos_nao_encontrados = len(documentos_nao_encontrados)
     qtde_documentos_encontrados = len(documentos_encontrados)
-    
-    return documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, qtde_documentos_nao_encontrados, qtde_documentos_encontrados
+
+    return (
+        documentos_encontrados,
+        documentos_nao_encontrados,
+        qtde_arquivos_pesquisados,
+        qtde_documentos_nao_encontrados,
+        qtde_documentos_encontrados
+    )
 
 def criar_relatorio(documentos_encontrados, documentos_nao_encontrados, qtde_arquivos_pesquisados, nome_arquivo, diretorio_atual): #função responsável por criar relatório dos arquivos pesquisados
     workbook = openpyxl.Workbook() #declarando o workbook
