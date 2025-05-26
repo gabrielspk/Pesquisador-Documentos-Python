@@ -65,7 +65,7 @@ def pesquisar_documentos(diretorio_atual, extensoes_descartadas, validacao_nomen
     )
 
 def executar_pesquisa_documentos(diretorio_atual, validar_fpl, documentos, log_callback):
-
+    
     inicio = time.time()
 
     extensoes_descartadas = (".fpl", ".zip", ".ini", ".pdf", ".xlsx")

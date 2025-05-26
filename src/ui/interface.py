@@ -6,7 +6,8 @@ from core.extracao import busca_reversa
 from core.pesquisa import executar_pesquisa_documentos
 from core.analise import processar_validacao
 from utils.utilitarios import carregar_documentos
-from utils.utilitarios import limpar_log
+from utils.utilitarios import limpar_textbox
+from utils.utilitarios import inserir_log
 
 # Variável global para armazenar o diretório selecionado
 diretorio_selecionado = None
@@ -81,7 +82,7 @@ def iniciar_interface():
             diretorio_atual=diretorio_selecionado,
             validar_fpl=validar_fpl,
             documentos=documentos,
-            log_callback=lambda msg: log_textbox.insert(tk.END, msg)
+            log_callback=lambda msg: inserir_log(log_textbox, msg)
         )
 
     pesquisar_button = tk.Button(
@@ -98,14 +99,15 @@ def iniciar_interface():
     log_textbox = scrolledtext.ScrolledText(log_frame, width=60, height=10)
     log_textbox.pack()
 
+    log_textbox.config(state='disabled')
+
     limpar_log_button = tk.Button(
         log_frame,
         text="Limpar Log",
         width=10,
-        command=lambda: limpar_log(log_textbox)
+        command=lambda: limpar_textbox(log_textbox)
     )
     limpar_log_button.pack(pady=5)
-
 
     ####### ABA 2 - Análise de relatórios #######
     aba2 = ttk.Frame(notebook)

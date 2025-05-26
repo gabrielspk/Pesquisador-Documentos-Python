@@ -28,5 +28,13 @@ def incrementar_nome_arquivo(nome_arquivo): #função responsável por iterar no
         count += 1
     return nome_arquivo
 
-def limpar_log(log_clear_callback):
-    log_clear_callback()
+def limpar_textbox(log_textbox):
+    log_textbox.config(state='normal')
+    log_textbox.delete('1.0', 'end')
+    log_textbox.config(state='disabled')
+
+def inserir_log(log_textbox, mensagem):
+    log_textbox.config(state='normal')
+    log_textbox.insert(tk.END, mensagem)
+    log_textbox.see(tk.END)
+    log_textbox.config(state='disabled')
