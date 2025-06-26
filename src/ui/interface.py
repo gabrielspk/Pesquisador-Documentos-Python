@@ -17,7 +17,7 @@ def iniciar_interface():
 
     janela = tk.Tk()
     janela.title("Pesquisa de Documentos")
-    janela.geometry("600x600")
+    janela.geometry("600x610")
     janela.resizable(False, False)
 
     # Estilo ttkbootstrap
@@ -26,6 +26,15 @@ def iniciar_interface():
     # Notebook para abas
     notebook = ttk.Notebook(janela)
     notebook.pack(pady=10, expand=True, fill='both')
+
+    # Rodapé
+    footer = tk.Label(
+    janela,
+    text="Developed with <3 by gabriel.ferreira",
+    font=("Montserrat", 8, "italic"),
+    fg="gray"
+    )
+    footer.pack(side="bottom", pady=5)
 
     ####### ABA 1 - Pesquisar Documentos #######
     aba1 = ttk.Frame(notebook)
